@@ -1,54 +1,92 @@
-module Main exposing (Model, Msg(..), init, main, update, view)
+module Main exposing (main)
 
 import Browser
+import Browser.Navigation as Nav
 import Html exposing (..)
-import Html.Events exposing (..)
-import Http
+import Html.Attributes exposing (..)
+import Url
+
+
+
+-- main
 
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.application
         { init = init
         , view = view
         , update = update
-        , subscriptions = \_ -> Sub.none
+        , subscriptions = subscriptions
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
 
+
+
+-- model
+
+
 type alias Model =
-    { result : String
+    { key : Nav.Key
+    , url : Url.Url
     }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { result = ""
-      }
-    , Cmd.none
-    )
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( Model key url, Cmd.none )
+
+
+
+-- update
 
 
 type Msg
-    = Click
-    | GotRepo (Result Http.Error String)
+    = LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Click ->
-            ( model, Http.get { url = "https://api.github.com/repos/elm/core", expect = Http.expectString GotRepo } )
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
 
-        GotRepo (Ok repo) ->
-            ( { model | result = repo }, Cmd.none )
+                Browser.External href ->
+                    ( model, Nav.load href )
 
-        GotRepo (Err error) ->
-            ( { model | result = Debug.toString error }, Cmd.none )
+        UrlChanged url ->
+            ( { model | url = url }
+            , Cmd.none
+            )
 
 
-view : Model -> Html Msg
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
+
+
+
+-- view
+
+
+view : Model -> Browser.Document Msg
 view model =
-    div []
-        [ button [ onClick Click ] [ text "Get Repository Info" ]
-        , p [] [ text model.result ]
+    { title = "Msg Interceptor"
+    , body =
+        [ text "The current URL is :"
+        , b [] [ text (Url.toString model.url) ]
+        , ul []
+            [ viewLink "/home"
+            , viewLink "/profile"
+            ]
         ]
+    }
+
+
+viewLink : String -> Html msg
+viewLink path =
+    li [] [ a [ href path ] [ text path ] ]
