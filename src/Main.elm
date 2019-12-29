@@ -2,63 +2,53 @@ module Main exposing (Model, Msg(..), init, main, update, view)
 
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (..)
 import Html.Events exposing (..)
+import Http
 
 
 main : Program () Model Msg
 main =
-    Browser.sandbox
+    Browser.element
         { init = init
-        , update = update
         , view = view
+        , update = update
+        , subscriptions = \_ -> Sub.none
         }
 
-
 type alias Model =
-    { input : String
-    , memos : List String
+    { result : String
     }
 
 
-init : Model
-init =
-    { input = ""
-    , memos = []
-    }
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { result = ""
+      }
+    , Cmd.none
+    )
 
 
 type Msg
-    = Input String
-    | Submit
+    = Click
+    | GotRepo (Result Http.Error String)
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        Input input ->
-            { model | input = input }
+        Click ->
+            ( model, Http.get { url = "https://api.github.com/repos/elm/core", expect = Http.expectString GotRepo } )
 
-        Submit ->
-            { model
-                | input = ""
-                , memos = model.input :: model.memos
-            }
+        GotRepo (Ok repo) ->
+            ( { model | result = repo }, Cmd.none )
+
+        GotRepo (Err error) ->
+            ( { model | result = Debug.toString error }, Cmd.none )
 
 
 view : Model -> Html Msg
 view model =
     div []
-        [ Html.form [ onSubmit Submit ]
-            [ input [ value model.input, onInput Input ] []
-            , button
-                [ disabled (String.length model.input < 1) ]
-                [ text "Submit" ]
-            ]
-        , ul [] (List.map viewMemo model.memos)
+        [ button [ onClick Click ] [ text "Get Repository Info" ]
+        , p [] [ text model.result ]
         ]
-
-
-viewMemo : String -> Html Msg
-viewMemo memo =
-    li [] [ text memo ]
